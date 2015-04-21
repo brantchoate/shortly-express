@@ -3,6 +3,8 @@ var util = require('./lib/utility');
 var partials = require('express-partials');
 var bodyParser = require('body-parser');
 var session = require('express-session');
+var cookieParser = require('cookie-parser')
+
 
 
 var db = require('./app/config');
@@ -14,6 +16,7 @@ var Click = require('./app/models/click');
 
 var app = express();
 
+app.use(cookieParser());
 app.use(session({
   // genid: function(req) {
   //   console.log(req);
@@ -35,10 +38,10 @@ app.use(express.static(__dirname + '/public'));
 
 app.get('/',
 function(req, res) {
-
   if(req.session.user){
     res.render('index');
   } else {
+    req.session.error = 'Access denied!';
     res.redirect('/login');
   }
 
@@ -55,7 +58,6 @@ function(req, res) {
 
 app.get('/links',
 function(req, res) {
-  console.log(req.session);
   if(req.session.user){
     Links.reset().fetch().then(function(links) {
       res.send(200, links.models);
@@ -113,50 +115,38 @@ app.post('/login', function(req, res){
   var username = req.body.username;
   var password = req.body.password;
 
-  //check db
-    //if they do create session
-    // else redirect to signup
-  // var username = request.body.username;
-  // var password = request.body.password;
-  // var salt = bcrypt.genSaltSync(10);
-  // var hash = bcrypt.hashSync(password, salt);
-  // var userObj = //db.users.findOne({ username: username, password: password });
-  // db.knex('users')
-  //     .where('username', '=', username);
-  //     console.log(userObj.username);
-  // if(userObj){
-  //     req.session.regenerate(function(){
-  //         req.session.user = userObj.username;
-  //         res.redirect('/');
-  //     });
-  // }
-  // else {
-  //     res.redirect('login');
-  // }
-
   new User({ username: username }).fetch().then(function(user) {
     if (!user) {
       res.redirect('/login');
     } else {
       req.session.regenerate(function(){
-          req.session.user = user.username;
-          // console.log(req.session.user);
-          res.redirect('/');
+          req.session.user = user.attributes.username;
+          req.session.id = user.attributes.id;
+          return res.redirect('/');
       });
-      // res.redirect('login');
-      // var click = new Click({
-      //   link_id: link.get('id')
-      // });
 
-      // click.save().then(function() {
-      //   db.knex('urls')
-      //     .where('code', '=', link.get('code'))
-      //     .update({
-      //       visits: link.get('visits') + 1,
-      //     }).then(function() {
-      //       return res.redirect(link.get('url'));
-      //     });
-      // });
+    }
+  });
+});
+
+app.post('/signup', function(req, res){
+  var username = req.body.username;
+  var password = req.body.password;
+
+  new User({ username: username }).fetch().then(function(user) {
+    if (!user) {
+       new User({
+          'username': username,
+          'password': password
+      }).save().then(function(user){
+        req.session.regenerate(function(){
+          req.session.user = user.attributes.username;
+          req.session.id = user.attributes.id;
+          return res.redirect('/');
+        });
+      });
+    } else {
+          return res.redirect('/login');
     }
   });
 });
