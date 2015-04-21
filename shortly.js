@@ -2,6 +2,7 @@ var express = require('express');
 var util = require('./lib/utility');
 var partials = require('express-partials');
 var bodyParser = require('body-parser');
+var session = require('express-session');
 
 
 var db = require('./app/config');
@@ -13,6 +14,16 @@ var Click = require('./app/models/click');
 
 var app = express();
 
+app.use(session({
+  // genid: function(req) {
+  //   console.log(req);
+  //   return genuuid(); // use UUIDs for session IDs
+  // },
+  httpOnly:false,
+  secret: 'keyboard cat',
+  resave: true,
+  saveUninitialized: false
+}));
 app.set('views', __dirname + '/views');
 app.set('view engine', 'ejs');
 app.use(partials());
@@ -22,25 +33,39 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(__dirname + '/public'));
 
-
-app.get('/', 
+app.get('/',
 function(req, res) {
-  res.render('index');
+
+  if(req.session.user){
+    res.render('index');
+  } else {
+    res.redirect('/login');
+  }
+
 });
 
-app.get('/create', 
+app.get('/create',
 function(req, res) {
-  res.render('index');
+  if(req.session.user){
+    res.render('index');
+  } else {
+    res.redirect('/login');
+  }
 });
 
-app.get('/links', 
+app.get('/links',
 function(req, res) {
-  Links.reset().fetch().then(function(links) {
-    res.send(200, links.models);
-  });
+  console.log(req.session);
+  if(req.session.user){
+    Links.reset().fetch().then(function(links) {
+      res.send(200, links.models);
+    });
+  } else {
+    res.redirect('/login');
+  }
 });
 
-app.post('/links', 
+app.post('/links',
 function(req, res) {
   var uri = req.body.url;
 
@@ -77,8 +102,64 @@ function(req, res) {
 /************************************************************/
 // Write your authentication routes here
 /************************************************************/
+app.get('/signup', function(req,res){
+  res.render('signup');
+});
+app.get('/login', function(req,res){
+  res.render('login');
+});
 
+app.post('/login', function(req, res){
+  var username = req.body.username;
+  var password = req.body.password;
 
+  //check db
+    //if they do create session
+    // else redirect to signup
+  // var username = request.body.username;
+  // var password = request.body.password;
+  // var salt = bcrypt.genSaltSync(10);
+  // var hash = bcrypt.hashSync(password, salt);
+  // var userObj = //db.users.findOne({ username: username, password: password });
+  // db.knex('users')
+  //     .where('username', '=', username);
+  //     console.log(userObj.username);
+  // if(userObj){
+  //     req.session.regenerate(function(){
+  //         req.session.user = userObj.username;
+  //         res.redirect('/');
+  //     });
+  // }
+  // else {
+  //     res.redirect('login');
+  // }
+
+  new User({ username: username }).fetch().then(function(user) {
+    if (!user) {
+      res.redirect('/login');
+    } else {
+      req.session.regenerate(function(){
+          req.session.user = user.username;
+          // console.log(req.session.user);
+          res.redirect('/');
+      });
+      // res.redirect('login');
+      // var click = new Click({
+      //   link_id: link.get('id')
+      // });
+
+      // click.save().then(function() {
+      //   db.knex('urls')
+      //     .where('code', '=', link.get('code'))
+      //     .update({
+      //       visits: link.get('visits') + 1,
+      //     }).then(function() {
+      //       return res.redirect(link.get('url'));
+      //     });
+      // });
+    }
+  });
+});
 
 /************************************************************/
 // Handle the wildcard route last - if all other routes fail
